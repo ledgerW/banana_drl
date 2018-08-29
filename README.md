@@ -4,9 +4,7 @@
 
 # Banana Game Navigation DDQN Agent in Unity Environment
 
-### Introduction
-
-For this project, you will train an agent to navigate (and collect bananas!) in a large, square world.  
+### Introduction  
 
 ![Trained Agent][image1]
 
