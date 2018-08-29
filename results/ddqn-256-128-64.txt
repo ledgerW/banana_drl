@@ -1,0 +1,3 @@
+
+Environment solved in 246 episodes!	Average Score: 13.04
+Episode 1000	Average Score: 15.53
