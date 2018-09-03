@@ -2,7 +2,7 @@ import numpy as np
 import random
 from collections import namedtuple, deque
 
-from model import QNetwork
+from model import QNetwork, ConvQNetwork
 
 import torch
 import torch.nn.functional as F
@@ -15,7 +15,7 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 class Agent():
     """Interacts with and learns from the environment."""
 
-    def __init__(self, state_size, action_size, seed, layer_units, hyperams, extensions):
+    def __init__(self, state_size, action_size, seed, ConvDQN, m_frames, layer_units, hyperams, extensions):
         """Initialize an Agent object.
         
         Params
@@ -31,14 +31,21 @@ class Agent():
         self.BUFFER_SIZE, self.BATCH_SIZE, self.GAMMA, self.TAU, self.LR, self.UPDATE_EVERY = hyperams
         layers, fc1, fc2, fc3 = layer_units
         self.DDQN, self.PER, self.DUELING, self.DISTRIBUTIONAL = extensions
+        self.ConvDQN = ConvDQN
 
-        # Q-Network
-        self.qnetwork_local = QNetwork(state_size, action_size, seed, layers, fc1, fc2, fc3).to(device)
-        self.qnetwork_target = QNetwork(state_size, action_size, seed, layers, fc1, fc2, fc3).to(device)
-        self.optimizer = optim.Adam(self.qnetwork_local.parameters(), lr=self.LR)
+        if ConvDQN:
+            # Conv-Q-Network
+            self.qnetwork_local = ConvQNetwork(state_size, m_frames, action_size, seed).to(device)
+            self.qnetwork_target = ConvQNetwork(state_size, m_frames, action_size, seed).to(device)
+            self.optimizer = optim.Adam(self.qnetwork_local.parameters(), lr=self.LR)
+        else:
+            # Q-Network
+            self.qnetwork_local = QNetwork(state_size, action_size, seed, layers, fc1, fc2, fc3).to(device)
+            self.qnetwork_target = QNetwork(state_size, action_size, seed, layers, fc1, fc2, fc3).to(device)
+            self.optimizer = optim.Adam(self.qnetwork_local.parameters(), lr=self.LR)
 
         # Replay memory
-        self.memory = ReplayBuffer(action_size, self.BUFFER_SIZE, self.BATCH_SIZE, seed)
+        self.memory = ReplayBuffer(ConvDQN, action_size, self.BUFFER_SIZE, self.BATCH_SIZE, seed)
         # Initialize time step (for updating every UPDATE_EVERY steps)
         self.t_step = 0
     
@@ -62,7 +69,11 @@ class Agent():
             state (array_like): current state
             eps (float): epsilon, for epsilon-greedy action selection
         """
-        state = torch.from_numpy(state).float().unsqueeze(0).to(device)
+        if self.ConvDQN:
+            state = torch.from_numpy(state).float().unsqueeze(0).to(device)
+        else:
+            state = torch.from_numpy(state).float().unsqueeze(0).to(device)
+            
         self.qnetwork_local.eval()
         with torch.no_grad():
             action_values = self.qnetwork_local(state)
@@ -123,7 +134,7 @@ class Agent():
 class ReplayBuffer:
     """Fixed-size buffer to store experience tuples."""
 
-    def __init__(self, action_size, buffer_size, batch_size, seed):
+    def __init__(self, ConvDQN, action_size, buffer_size, batch_size, seed):
         """Initialize a ReplayBuffer object.
         Params
         ======
@@ -132,6 +143,7 @@ class ReplayBuffer:
             batch_size (int): size of each training batch
             seed (int): random seed
         """
+        self.ConvDQN = ConvDQN
         self.action_size = action_size
         self.memory = deque(maxlen=buffer_size)  
         self.batch_size = batch_size
@@ -140,8 +152,12 @@ class ReplayBuffer:
     
     def add(self, state, action, reward, next_state, done):
         """Add a new experience to memory."""
-        e = self.experience(state, action, reward, next_state, done)
+        if self.ConvDQN:
+            e = self.experience(torch.from_numpy(state).unsqueeze(0), action, reward, torch.from_numpy(next_state).unsqueeze(0), done)
+        else:
+            e = self.experience(state, action, reward, next_state, done)
         self.memory.append(e)
+        
     
     def sample(self):
         """Randomly sample a batch of experiences from memory."""
