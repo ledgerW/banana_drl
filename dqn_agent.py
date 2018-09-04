@@ -37,7 +37,7 @@ class Agent():
             # Conv-Q-Network
             self.qnetwork_local = ConvQNetwork(state_size, m_frames, action_size, seed).to(device)
             self.qnetwork_target = ConvQNetwork(state_size, m_frames, action_size, seed).to(device)
-            self.optimizer = optim.Adam(self.qnetwork_local.parameters(), lr=self.LR)
+            self.optimizer = optim.RMSprop(self.qnetwork_local.parameters(), lr=self.LR, momentum=0.95)
         else:
             # Q-Network
             self.qnetwork_local = QNetwork(state_size, action_size, seed, layers, fc1, fc2, fc3).to(device)
